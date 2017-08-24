@@ -23,6 +23,8 @@
   "homepage": "https://github.com/Marchuck/SlackForDinner#readme",
   "dependencies": {
     "fbgraph": "^1.4.1",
+    "google-translate-api": "^2.3.0",
+    "node-cron": "^1.2.1",
     "slackbots": "^0.3.0"
   }
 }

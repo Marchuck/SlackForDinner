@@ -1,40 +1,100 @@
 var Bot = require('slackbots');
-
 var graph = require('fbgraph');
- 
+
 const kwintesencja_id = 962955043715236;
-const access_token = "EAACEdEose0cBAHxnbRsg3lTV0GG7EYZAxJLhRbQBMoEwfFxE4g8MCGGTUQSJz6bwzRrRHq8NIaKw9LEN4qVwbu3DkCnJoKM8gUz7Kn6ZA7ygcNQsmhgZB1wfX8PWa3irkUZBE4klpWKh6DZBZBGD4iIBmK4T1ZC57LVUmXfQrGfBSzWMGarxv0TWwfCdUEICGYZD";
+var CronJob = require('cron').CronJob;
+
+const months = ['Stycznia', 'Lutego','Marca','Kwietnia','Maja','Czerwca', 'Lipca','Sierpnia','Września',  'Października', 'Listopada','Grudnia'];
+
+const access_token = "EAACEdEose0cBAI13TzsG6lSInZA8PhfiEQ93HbiHecM0IEEZA2nxbr95gAsGEFqJ7Dzfe1q4HSmrDHHjXvrZC44jdWGrwLFNzdX9fFkwM1Hbtcuzv2xqZCZCK4yPIj1DWsd6DZCOKvdikfccZBOuZCwCjqownGdPLVQELKi9BmniSShbl5sJPQ6lHNupCQAQZAGmDyVMNMsgGTgZDZD";
 
 graph.setAccessToken(access_token);
 
+const translate = require('google-translate-api');
+
+const getTranslation = function(dinner, callback){
+ 
+    translate(dinner, {from: 'pl', to: 'en'}).then(res => {
+    console.log('res.text: '+res.text);
+    console.log('res.text.autoCorrected: '+res.from.text.autoCorrected);
+    console.log('res.from.text.value: '+res.from.text.value);
+    console.log('res.from.text.didYouMean: '+res.from.text.didYouMean);
+    callback(undefined,res);
+}).catch(err => {
+    callback(err, undefined);
+});   
+}
+
+const parseDinnerData = function(res){
+    var recentFeed = res["data"][0];
+    var lastDinner = recentFeed["message"];
+    var time = recentFeed["created_time"];
+    return { 
+        time: time,//time of posting this message on facebook
+        lastDinner: lastDinner//post content
+    };
+}
+
+const getDateInfo = function(){
+    var date = new Date();
+    var day = date.getUTCDay();
+    var month = date.getUTCMonth();
+    var year = date.getUTCFullYear();
+    var timeInfo = '\n*Kwintesencja Menu na dzień ' + day + " " + months[month] + " " + year + "*\n";
+    return timeInfo;
+}
+
 const postRecentLunch = function(channel, bot){
-	graph.get(String(kwintesencja_id) + "/feed", function(err, res) {
-		var recentFeed = res["data"][0];
-        var lastDinner = recentFeed["message"];
-        var time = recentFeed["created_time"];
-        console.log('time: '+time);
-        console.log('recent dinner: '+ lastDinner);
-        bot.postMessageToGroup(channel, time+"\n"+lastDinner);
+	
+    graph.get(String(kwintesencja_id) + "/feed", function(err, res) {
+		
+        var dinnerInfo = parseDinnerData(res);
+        var timeInfo = getDateInfo();
+        var lastDinnerInfo = dinnerInfo.lastDinner;
+        
+        getTranslation(lastDinnerInfo, function(error,response){
+            
+            var polishInfo = timeInfo + "\n" + lastDinnerInfo;
+            if(error){
+                bot.postMessageToChannel(channel, polishInfo);    
+            }else{
+                var englishInfo = response.text;
+                bot.postMessageToChannel(channel, polishInfo+"\n\nFor *Emmanuel* ;)\n\n"+englishInfo);
+            }
+        });
     });
 };
-// create a bot
+
+const startCronJob = function(bot){
+    var job = new CronJob({
+    cronTime: '00 30 11 * * 1-5',
+    onTick: function() {
+        /* 
+        Runs every weekday (Monday through Friday) at 11:30:00 AM.
+        It does not run on Saturday or Sunday.
+        */
+        console.log('tick!');
+        postRecentLunch('test_bots_channel', bot); 
+    }
+        
+    });
+    job.start();
+}
+
 var settings = {
-//    token: 'xoxb-231195319477-cvksXLKpImZjqMSWIdTv7ZTS',
-    token: 'xoxb-229464761044-L7nfFVIs5q3eNWY5grFlyAR4',
-    name: 'kwintesencja'
+    token: 'xoxb-232022068086-02HR3UMfFGZTXhFI7tENMAfb',
+    name: 'kwintesencja2'
 };
 var bot = new Bot(settings);
 
 bot.on('start', function() {
-   // bot.postMessageToChannel('random', 'Hello channel!');
-   // bot.postMessageToUser('lukasz', 'hello bro!');
-    //bot.postMessageToGroup('some-private-group', 'hello group chat!');
+    console.log('bot started');
+    //uncomment - for testing purposes
+    //postRecentLunch('test_bots_channel',bot);
+
+    startCronJob(bot);
 });
 
 bot.on('message', function() {
-    
-    postRecentLunch('lunch',bot);
+    //do nothing
 });
-
-
-console.log('bot work started');
